@@ -1,0 +1,49 @@
+image: python:3.10.0
+
+pipelines:
+  tags:
+    '*':
+      - step:
+          name: Build and Push Docker Image to The Google Artifact Registry.
+          script:
+            # Install Git LFS
+            - apt-get update && apt-get install -y git-lfs
+              # Initialize Git LFS
+            - git lfs pull
+
+            # Update package information and install required tools
+            - apt-get update && apt-get install -y curl unzip
+
+            # Download and install Google Cloud SDK
+            - curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-457.0.0-linux-x86_64.tar.gz
+            - tar -xf google-cloud-cli-457.0.0-linux-x86_64.tar.gz
+            - export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+            - ./google-cloud-sdk/install.sh
+            - echo "Installed Google Cloud SDK"
+
+            # Source the environment variables from the installation
+            - source "$(find . -name path.bash.inc | head -n 1)"
+            - export PATH=$PATH:"$(find . -name google-cloud-sdk | head -n 1)"/bin
+
+            # Set up service account credentials for Google Cloud SDK
+            - echo $GCLOUD_SERVICE_KEY | base64 -d > /tmp/keyfile.json
+            - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/keyfile.json
+            - gcloud auth activate-service-account --key-file=/tmp/keyfile.json
+
+            # Configure Docker to use Google Artifact Registry
+            - gcloud auth configure-docker europe-west3-docker.pkg.dev
+
+            # Set the Google Cloud project ID
+            - gcloud config set project $GCP_PROJECT_ID
+
+            # Build Docker image and tag it
+            - unzip ./models/bert_model.zip -d ./models/
+            - docker build -t nlp:$BITBUCKET_TAG-$BITBUCKET_COMMIT .
+            - docker tag nlp:$BITBUCKET_TAG-$BITBUCKET_COMMIT europe-west3-docker.pkg.dev/$GCP_PROJECT_ID/assistant-images/nlp:$BITBUCKET_TAG-$BITBUCKET_COMMIT
+
+            # Push Docker image to Google Artifact Registry
+            - docker push europe-west3-docker.pkg.dev/$GCP_PROJECT_ID/assistant-images/nlp:$BITBUCKET_TAG-$BITBUCKET_COMMIT
+            - echo "Image built and tagged successfully"
+
+          services:
+            - docker
