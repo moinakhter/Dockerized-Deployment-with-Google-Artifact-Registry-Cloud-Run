@@ -86,6 +86,4 @@ Ensure the following Bitbucket repository variables are set:
 - Modify the `gcloud auth configure-docker` region (`europe-west3-docker.pkg.dev`) based on your Google Cloud region.
 - Update the `google-cloud-cli` version if necessary to use the latest features and fixes.
 
-## License
-This project is licensed under the MIT License.
 
